@@ -1,18 +1,15 @@
-import telebot
-import requests
 import os
+import requests
+import telebot
 
 # ✅ طباعة جميع المتغيرات البيئية للتحقق مما يتم تحميله
 print("🔍 جميع المتغيرات البيئية:")
 print(os.environ)
 
-# ✅ طباعة المتغيرات البيئية المطلوبة
-print("🔍 TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
-print("🔍 VIRUSTOTAL_API_KEY:", os.getenv("VIRUSTOTAL_API_KEY"))
-
-# ✅ تحميل المتغيرات البيئية
+# ✅ تحميل المتغيرات البيئية بشكل صحيح
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
 # ✅ التأكد من أن التوكنات محملة بشكل صحيح
 if not TOKEN:
@@ -23,11 +20,7 @@ if not VIRUSTOTAL_API_KEY:
 # 🔹 تهيئة البوت
 bot = telebot.TeleBot(TOKEN)
 
-# ✅ حذف الـ Webhook إذا كان مفعلًا لتجنب الخطأ 409
-bot.remove_webhook()
-
-VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
-
+# ✅ أوامر البوت
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.reply_to(message, "✅ مرحبًا بك! أرسل لي رابطًا وسأقوم بفحصه عبر VirusTotal 🔍")
@@ -40,25 +33,31 @@ def scan_url(message):
 
     try:
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
-        
-        if response.status_code == 200:
-            result = response.json()
-            scan_id = result["data"]["id"]
-            positives = result["data"]["attributes"]["last_analysis_stats"]["malicious"]
-            
-            if positives == 0:
-                status = "✅ الرابط آمن تمامًا."
-            elif positives <= 3:
-                status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
-            else:
-                status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+        response_json = response.json()  # تحويل الرد إلى JSON
 
-            bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
+        print("🔍 استجابة API الكاملة:", response_json)  # ✅ طباعة الاستجابة لرؤية المشكلة
+
+        if response.status_code == 200 and "data" in response_json:
+            scan_id = response_json["data"]["id"]
+            if "attributes" in response_json["data"]:
+                positives = response_json["data"]["attributes"]["last_analysis_stats"]["malicious"]
+
+                if positives == 0:
+                    status = "✅ الرابط آمن تمامًا."
+                elif positives <= 3:
+                    status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+                else:
+                    status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+
+                bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
+            else:
+                bot.reply_to(message, "❌ حدث خطأ أثناء الفحص: الاستجابة لا تحتوي على 'attributes'.")
         else:
-            bot.reply_to(message, "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.")
+            bot.reply_to(message, f"❌ خطأ في الاستجابة من API: {response_json.get('error', 'مشكلة غير معروفة')}")
 
     except Exception as e:
         bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
 
 # 🔹 تشغيل البوت
+print("🚀 البوت يعمل الآن...")
 bot.polling()
