@@ -1,14 +1,18 @@
 import os
 import time
-import telebot
 import requests
+import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ✅ تحميل المتغيرات البيئية
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 
-# ✅ التأكد من أن التوكنات محملة بشكل صحيح
+# ✅ طباعة المتغيرات البيئية للتحقق منها
+print("🔍 TELEGRAM_BOT_TOKEN:", TOKEN)
+print("🔍 VIRUSTOTAL_API_KEY:", VIRUSTOTAL_API_KEY)
+
+# ✅ التحقق من وجود التوكنات قبل بدء البوت
 if not TOKEN:
     raise ValueError("❌ خطأ: لم يتم العثور على `TELEGRAM_BOT_TOKEN` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
 if not VIRUSTOTAL_API_KEY:
@@ -18,124 +22,95 @@ if not VIRUSTOTAL_API_KEY:
 bot = telebot.TeleBot(TOKEN)
 VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
-# ✅ الكلمات المفتاحية للرسالة الترحيبية
-GREETING_KEYWORDS = ["السلام عليكم", "السلام", "هلا", "الو", "hello", "hi", "مرحبا", "مرحبا بك"]
+# 🔹 الكلمات الترحيبية
+greetings = ["السلام عليكم", "هلا", "الو", "hello", "hi", "سلام", "مرحبا", "أهلا", "اهلين", "ألو"]
 
-# ✅ الرسالة الترحيبية
-def get_welcome_message():
-    return (
-        "👋 مرحبًا بك، أنا *HADI*!\n"
-        "🔍 فحص الروابط عبر *VirusTotal!*\n\n"
-        "🚀 سيساعدك هذا البوت في اكتشاف الروابط المشبوهة والمواقع الاحتيالية.\n"
-        "🛡️ أرسل لي أي رابط مشبوه وسأقوم بفحصه لك باستخدام قاعدة بيانات عالمية لمكافحة الاحتيال.\n\n"
-        "📌 *الاستخدام:*\n"
-        "1️⃣ أرسل رابطًا مباشرًا، أو استخدم الأمر `/scan <الرابط>`.\n"
-        "2️⃣ انتظر قليلاً وسأخبرك بالنتيجة. 🧐\n\n"
-        "🤲 *لا تنسوني من دعائكم!*"
-    )
+@bot.message_handler(func=lambda message: message.text.lower() in greetings)
+def greet_user(message):
+    welcome_text = """👋 مرحبًا بك، أنا **HADI**  
+🔍 **فحص الروابط عبر VirusTotal**  
 
-# ✅ إنشاء لوحة الأزرار عند النتيجة فقط
-def get_result_buttons():
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("🔄 فحص رابط آخر", callback_data="rescan"))
-    markup.add(InlineKeyboardButton("👤 من أنا؟", callback_data="about"))
-    return markup
+🚀 سيساعدك هذا البوت في اكتشاف الروابط المشبوهة والمواقع الاحتيالية.  
+🛡️ أرسل لي أي رابط مشبوه وسأقوم بفحصه لك باستخدام قاعدة بيانات عالمية لمكافحة الاحتيال.
 
-@bot.message_handler(commands=['start'])
-@bot.message_handler(func=lambda message: message.text.lower() in GREETING_KEYWORDS)
-def start(message):
-    bot.send_message(
-        message.chat.id,
-        get_welcome_message(),
-        parse_mode="Markdown"
-    )
+📌 **الاستخدام**:
+1️⃣ **أرسل رابطًا مباشرةً أو استخدم الأمر** `/scan <الرابط>`  
+2️⃣ **انتظر قليلاً وسأخبرك بالنتيجة. 😳**  
 
+⚠️ لا تنسوني من دعائكم! 🙌"""
+    bot.reply_to(message, welcome_text, parse_mode="Markdown")
+
+# 🔹 فحص الروابط
 @bot.message_handler(commands=['scan'])
-@bot.message_handler(func=lambda message: message.text.startswith("http"))
 def scan_url(message):
-    url_to_scan = message.text.split(" ")[-1]  # دعم الأمر /scan <الرابط>
+    try:
+        url_to_scan = message.text.split(" ", 1)[1]  # استخراج الرابط من الرسالة
+    except IndexError:
+        bot.reply_to(message, "❌ **الرجاء إرسال رابط بعد الأمر /scan**")
+        return
+
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url_to_scan}
 
-    bot.send_message(
-        message.chat.id,
-        "🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍",
-    )
+    # إرسال إشعار ببدء الفحص
+    bot.reply_to(message, "🔍 يتم الآن فحص الرابط... يرجى الانتظار ⏳")
 
     try:
-        # إرسال الطلب الأولي لفحص الرابط
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
-        result = response.json()
-
-        if "data" in result and "id" in result["data"]:
+        
+        if response.status_code == 200:
+            result = response.json()
             scan_id = result["data"]["id"]
 
-            # ✅ الانتظار 10 ثواني قبل جلب النتيجة
+            # انتظار 10 ثواني قبل جلب النتيجة
             time.sleep(10)
 
-            # ✅ جلب نتيجة الفحص بعد مرور 10 ثواني
-            report_url = f"https://www.virustotal.com/api/v3/analyses/{scan_id}"
-            report_response = requests.get(report_url, headers=headers)
-            report_result = report_response.json()
+            # جلب النتيجة النهائية
+            result_response = requests.get(f"https://www.virustotal.com/api/v3/analyses/{scan_id}", headers=headers)
+            result_data = result_response.json()
 
-            if "data" in report_result and "attributes" in report_result["data"]:
-                positives = report_result["data"]["attributes"]["stats"]["malicious"]
+            if "attributes" in result_data["data"]:
+                positives = result_data["data"]["attributes"]["stats"]["malicious"]
 
                 if positives == 0:
-                    status = "✅ الرابط آمن تمامًا."
+                    status = "✅ **الرابط آمن تمامًا بإذن الله، بس خلك حريص! فضاء الإنترنت لا يوجد به أمان.**"
                 elif positives <= 3:
-                    status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+                    status = "⚠️ **الرابط مشبوه، يرجى توخي الحذر.**"
                 else:
-                    status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+                    status = "❌ **الرابط احتيالي أو ضار، لا تقم بفتحه!**"
 
-                # ✅ إرسال النتيجة مع الأزرار
-                bot.send_message(
-                    message.chat.id,
-                    f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})",
-                    parse_mode="Markdown",
-                    reply_markup=get_result_buttons()
+                # 🔹 إضافة أزرار (فحص رابط آخر، من أنا)
+                keyboard = InlineKeyboardMarkup()
+                keyboard.row_width = 1
+                keyboard.add(
+                    InlineKeyboardButton("🔄 فحص رابط آخر", callback_data="scan_again"),
+                    InlineKeyboardButton("👤 من أنا؟", callback_data="who_am_i")
                 )
+
+                bot.reply_to(message, status, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                bot.send_message(
-                    message.chat.id,
-                    "❌ حدث خطأ أثناء الفحص: لم يتم العثور على بيانات التحليل.",
-                    reply_markup=get_result_buttons()
-                )
+                bot.reply_to(message, "❌ **حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.**")
         else:
-            bot.send_message(
-                message.chat.id,
-                "❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.",
-                reply_markup=get_result_buttons()
-            )
+            bot.reply_to(message, "❌ **حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.**")
 
     except Exception as e:
-        bot.send_message(
-            message.chat.id,
-            f"❌ حدث خطأ أثناء الفحص:\n{str(e)}",
-            reply_markup=get_result_buttons()
-        )
+        bot.reply_to(message, f"❌ **حدث خطأ أثناء الفحص:**\n`{str(e)}`", parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: call.data == "rescan")
-def rescan(call):
-    bot.send_message(
-        call.message.chat.id,
-        "📌 أرسل الرابط الذي تريد فحصه مجددًا:"
-    )
+# 🔹 التعامل مع الأزرار
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    if call.data == "scan_again":
+        bot.send_message(call.message.chat.id, "🔍 **أرسل رابطًا جديدًا لفحصه.**")
+    elif call.data == "who_am_i":
+        about_text = """👤 **أنا HADI**  
+💻 **خبير في اختبار الاختراق والاستجابة للحوادث السيبرانية.**  
+🛡️ **قمت بصناعة هذا البوت بسبب كثرة الاحتيال المالي والمعلوماتي، والأهم من ذلك هو وعيك!**  
+🚀 **قريبًا سأطلق بوت يقوم بفحص الملفات المشبوهة.**  
+🎁 **هذا العمل إهداء لوالدي ووالدتي وأصدقائي الداعمين لي.**  
 
-@bot.callback_query_handler(func=lambda call: call.data == "about")
-def about(call):
-    bot.send_message(
-        call.message.chat.id,
-        "👤 *من أنا؟*\n"
-        "أنا *HADI*، خبير في اختبار الاختراق والاستجابة للحوادث السيبرانية.\n"
-        "📌 قمت بصناعة هذا البوت بسبب كثرة الاحتيال المالي والمعلوماتي.\n"
-        "🔍 الأهم من ذلك هو وعيك بخطورة الروابط المشبوهة!\n"
-        "💡 قريبًا سأطلق بوت يقوم بفحص الملفات المشبوهة أيضًا.\n\n"
-        "🎁 *هذا العمل إهداء لوالديّ وأصدقائي الداعمين لي.*\n"
-        "📢 تابعني على منصة X: [HA_cys](https://x.com/HA_cys)",
-        parse_mode="Markdown",
-        disable_web_page_preview=True
-    )
+📌 **حسابي على X:** [HA_cys](https://x.com/HA_cys)
+"""
+        bot.send_message(call.message.chat.id, about_text, parse_mode="Markdown")
 
 # 🔹 تشغيل البوت
 bot.polling()
