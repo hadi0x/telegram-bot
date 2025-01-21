@@ -1,13 +1,11 @@
 import os
-import time
-import requests
 import telebot
+import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ✅ تحميل المتغيرات البيئية
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
-VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
 # ✅ التأكد من أن التوكنات محملة بشكل صحيح
 if not TOKEN:
@@ -17,111 +15,97 @@ if not VIRUSTOTAL_API_KEY:
 
 # 🔹 تهيئة البوت
 bot = telebot.TeleBot(TOKEN)
+VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
-# ✅ الكلمات الاستدلالية التي تستدعي الترحيب
-GREETINGS = [
-    "السلام عليكم", "السلام", "هلا", "ألو", "Hello", "Hi", "مرحبا", "يا هلا", "مساء الخير", 
-    "صباح الخير", "تحية", "مراحب", "كيف حالك", "سلام", "هلا والله"
-]
+# ✅ الكلمات المفتاحية للرسالة الترحيبية
+GREETING_KEYWORDS = ["السلام عليكم", "السلام", "هلا", "الو", "hello", "hi", "مرحبا", "مرحبا بك"]
 
-@bot.message_handler(func=lambda message: True, content_types=['text'])
-def greeting_response(message):
-    if message.text.strip() in GREETINGS or message.chat.type == "private":
-        welcome_text = (
-            "👋 **مرحبًا بك، أنا HADI، فحص الروابط عبر VirusTotal!**\n"
-            "🚀 يساعدك هذا البوت في **اكتشاف الروابط المشبوهة والمواقع الاحتيالية** 🔍\n"
-            "🛡 أرسل لي أي **رابط مشبوه** وسأقوم بفحصه لك باستخدام قاعدة بيانات عالمية لمكافحة الاحتيال.\n\n"
-            "📌 **الاستخدام:**\n"
-            "• أرسل رابطًا مباشرة أو استخدم الأمر `/scan <الرابط>`.\n\n"
-            "🤲 **لا تنسوني من دعائكم**"
-        )
-        bot.reply_to(message, welcome_text, parse_mode="Markdown", disable_web_page_preview=True)
+# ✅ الرسالة الترحيبية
+def get_welcome_message():
+    return (
+        "👋 مرحبًا بك، أنا *HADI*!\n"
+        "🔍 فحص الروابط عبر *VirusTotal!*\n\n"
+        "🚀 سيساعدك هذا البوت في اكتشاف الروابط المشبوهة والمواقع الاحتيالية.\n"
+        "🛡️ أرسل لي أي رابط مشبوه وسأقوم بفحصه لك باستخدام قاعدة بيانات عالمية لمكافحة الاحتيال.\n\n"
+        "📌 *الاستخدام:*\n"
+        "1️⃣ أرسل رابطًا مباشرًا، أو استخدم الأمر `/scan <الرابط>`.\n"
+        "2️⃣ انتظر قليلاً وسأخبرك بالنتيجة. 🧐\n\n"
+        "🤲 *لا تنسوني من دعائكم!*"
+    )
+
+# ✅ إنشاء لوحة الأزرار
+def get_main_buttons():
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🔄 فحص رابط آخر", callback_data="rescan"))
+    markup.add(InlineKeyboardButton("👤 من أنا؟", callback_data="about"))
+    return markup
+
+@bot.message_handler(commands=['start'])
+@bot.message_handler(func=lambda message: message.text.lower() in GREETING_KEYWORDS)
+def start(message):
+    bot.send_message(
+        message.chat.id,
+        get_welcome_message(),
+        parse_mode="Markdown",
+        reply_markup=get_main_buttons()
+    )
 
 @bot.message_handler(commands=['scan'])
-def scan_command(message):
-    parts = message.text.split()
-    if len(parts) < 2:
-        bot.reply_to(message, "❌ **الاستخدام الصحيح:** `/scan <الرابط>`", parse_mode="Markdown")
-        return
-    scan_url(message, parts[1])
-
 @bot.message_handler(func=lambda message: message.text.startswith("http"))
-def scan_url(message, url_to_scan=None):
-    url_to_scan = url_to_scan or message.text
+def scan_url(message):
+    url_to_scan = message.text.split(" ")[-1]  # دعم الأمر /scan <الرابط>
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url_to_scan}
 
     try:
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
-        
-        if response.status_code == 200:
-            result = response.json()
+        result = response.json()
+
+        if "data" in result and "id" in result["data"]:
             scan_id = result["data"]["id"]
-
-            # ⏳ الانتظار 10 ثوانٍ للحصول على نتائج دقيقة
-            time.sleep(10)
-
-            # 🔍 جلب نتائج الفحص
-            report_url = f"https://www.virustotal.com/api/v3/analyses/{scan_id}"
-            report_response = requests.get(report_url, headers=headers)
-            report_data = report_response.json()
-
-            if "attributes" not in report_data["data"]:
-                bot.reply_to(message, f"❌ حدث خطأ أثناء جلب نتائج التحليل.\n📌 الرد: {report_data}")
-                return
-
-            positives = report_data["data"]["attributes"]["stats"]["malicious"]
-            total_scans = sum(report_data["data"]["attributes"]["stats"].values())
-
-            # 🟢 تحديد مستوى الخطر
-            if positives == 0:
-                status = "✅ الرابط آمن تمامًا."
-                emoji = "🟢"
-            elif positives <= 3:
-                status = "⚠️ الرابط **مشبوه**، يرجى توخي الحذر!"
-                emoji = "🟠"
-            else:
-                status = "❌ **الرابط خطير جدًا! لا تقم بفتحه!** 🚨"
-                emoji = "🔴"
-
-            # 🖱 أزرار التفاعل
-            markup = InlineKeyboardMarkup()
-            btn_scan_another = InlineKeyboardButton("🔍 فحص رابط آخر", callback_data="scan_again")
-            btn_about = InlineKeyboardButton("🙋‍♂️ من أنا؟", callback_data="about_me")
-            markup.add(btn_scan_another, btn_about)
-
-            response_text = (
-                f"{emoji} {status}\n"
-                f"🔍 **عدد الفحوصات:** {total_scans}\n"
-                f"☠️ **تم اكتشافه كخطر من:** {positives} برامج مكافحة الفيروسات\n"
-                "🤲 **لا تنسوني من دعائكم**"
+            bot.send_message(
+                message.chat.id,
+                f"🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍\n\n"
+                f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})",
+                parse_mode="Markdown",
+                reply_markup=get_main_buttons()
+            )
+        else:
+            bot.send_message(
+                message.chat.id,
+                "❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.",
+                reply_markup=get_main_buttons()
             )
 
-            bot.send_message(message.chat.id, response_text, reply_markup=markup, parse_mode="Markdown", disable_web_page_preview=True)
-        else:
-            bot.reply_to(message, "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.")
-
     except Exception as e:
-        bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
+        bot.send_message(
+            message.chat.id,
+            f"❌ حدث خطأ أثناء الفحص:\n{str(e)}",
+            reply_markup=get_main_buttons()
+        )
 
-# ✅ التعامل مع الأزرار
-@bot.callback_query_handler(func=lambda call: call.data == "scan_again")
-def scan_again_callback(call):
-    bot.send_message(call.message.chat.id, "🔍 **أرسل الرابط الجديد لفحصه.**", parse_mode="Markdown")
-
-@bot.callback_query_handler(func=lambda call: call.data == "about_me")
-def about_me_callback(call):
-    about_text = (
-        "🙋‍♂️ **من أنا؟**\n"
-        "👨‍💻 **اسمي HADI، خبير في اختبار الاختراق والاستجابة للحوادث السيبرانية** 🔥\n\n"
-        "🛡 **لماذا صنعت هذا البوت؟**\n"
-        "📌 بسبب **كثرة الاحتيال المالي والمعلوماتي**، قررت إطلاق بوت يساعد المستخدمين في كشف الروابط المشبوهة بسهولة.\n\n"
-        "🚀 **ما القادم؟**\n"
-        "قريبًا سأطلق **بوت يقوم بفحص الملفات المشبوهة** 🛠\n\n"
-        "🎁 **هذا العمل إهداء لوالدي، والدتي، وأصدقائي الداعمين لي.** 💙\n\n"
-        "📢 **حسابي على X:** [HA_cys](https://x.com/HA_cys)"
+@bot.callback_query_handler(func=lambda call: call.data == "rescan")
+def rescan(call):
+    bot.send_message(
+        call.message.chat.id,
+        "📌 أرسل الرابط الذي تريد فحصه مجددًا:",
+        reply_markup=get_main_buttons()
     )
-    bot.send_message(call.message.chat.id, about_text, parse_mode="Markdown", disable_web_page_preview=True)
+
+@bot.callback_query_handler(func=lambda call: call.data == "about")
+def about(call):
+    bot.send_message(
+        call.message.chat.id,
+        "👤 *من أنا؟*\n"
+        "أنا *HADI*، خبير في اختبار الاختراق والاستجابة للحوادث السيبرانية.\n"
+        "📌 قمت بصناعة هذا البوت بسبب كثرة الاحتيال المالي والمعلوماتي.\n"
+        "🔍 الأهم من ذلك هو وعيك بخطورة الروابط المشبوهة!\n"
+        "💡 قريبًا سأطلق بوت يقوم بفحص الملفات المشبوهة أيضًا.\n\n"
+        "🎁 *هذا العمل إهداء لوالديّ وأصدقائي الداعمين لي.*\n"
+        "📢 تابعني على منصة X: [HA_cys](https://x.com/HA_cys)",
+        parse_mode="Markdown",
+        disable_web_page_preview=True
+    )
 
 # 🔹 تشغيل البوت
 bot.polling()
