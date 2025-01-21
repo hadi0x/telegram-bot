@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import telebot
+import re
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ✅ تحميل المتغيرات البيئية
@@ -25,6 +26,11 @@ VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 # 🔹 الكلمات الترحيبية
 greetings = ["السلام عليكم", "هلا", "الو", "hello", "hi", "سلام", "مرحبا", "أهلا", "اهلين", "ألو"]
 
+# 🔹 التعرف على الروابط
+def is_url(text):
+    url_pattern = re.compile(r"https?://\S+")
+    return bool(url_pattern.search(text))
+
 @bot.message_handler(func=lambda message: message.text.lower() in greetings)
 def greet_user(message):
     welcome_text = """👋 مرحبًا بك، أنا **HADI**  
@@ -40,14 +46,25 @@ def greet_user(message):
 ⚠️ لا تنسوني من دعائكم! 🙌"""
     bot.reply_to(message, welcome_text, parse_mode="Markdown")
 
-# 🔹 فحص الروابط
+# 🔹 فحص الروابط عند إرسالها مباشرةً بدون الحاجة إلى `/scan`
+@bot.message_handler(func=lambda message: is_url(message.text))
+def scan_direct_url(message):
+    scan_url(message, direct=True)
+
+# 🔹 فحص الروابط عند استخدام الأمر `/scan`
 @bot.message_handler(commands=['scan'])
-def scan_url(message):
+def scan_command_url(message):
     try:
         url_to_scan = message.text.split(" ", 1)[1]  # استخراج الرابط من الرسالة
     except IndexError:
         bot.reply_to(message, "❌ **الرجاء إرسال رابط بعد الأمر /scan**")
         return
+
+    scan_url(message, url_to_scan)
+
+# 🔹 الدالة العامة لفحص الروابط
+def scan_url(message, direct=False):
+    url_to_scan = message.text if direct else message.text.split(" ", 1)[1]
 
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url_to_scan}
