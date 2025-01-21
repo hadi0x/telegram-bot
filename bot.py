@@ -2,8 +2,7 @@ import telebot
 import requests
 import os
 
-TOKEN = os.getenv("7859572276:AAG36DlsII_cvHJauTAVshNreoMSYa1Qf7k
-")
+TOKEN = os.getenv("7899572276:AAG36D1sII_cvHJauTAVshNreoMSYa1QF7k")
 VIRUSTOTAL_API_KEY = os.getenv("7a9df9d88643a593720947c3d81bd56e71dc978cb2204618b89a3d32d3211174")
 VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
