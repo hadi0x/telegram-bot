@@ -1,4 +1,5 @@
 import os
+import time
 import telebot
 import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -56,24 +57,50 @@ def scan_url(message):
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url_to_scan}
 
+    bot.send_message(
+        message.chat.id,
+        "🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍",
+    )
+
     try:
+        # إرسال الطلب الأولي لفحص الرابط
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
         result = response.json()
 
         if "data" in result and "id" in result["data"]:
             scan_id = result["data"]["id"]
-            bot.send_message(
-                message.chat.id,
-                f"🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍",
-            )
 
-            # إرسال النتيجة مع الأزرار
-            bot.send_message(
-                message.chat.id,
-                f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})",
-                parse_mode="Markdown",
-                reply_markup=get_result_buttons()
-            )
+            # ✅ الانتظار 10 ثواني قبل جلب النتيجة
+            time.sleep(10)
+
+            # ✅ جلب نتيجة الفحص بعد مرور 10 ثواني
+            report_url = f"https://www.virustotal.com/api/v3/analyses/{scan_id}"
+            report_response = requests.get(report_url, headers=headers)
+            report_result = report_response.json()
+
+            if "data" in report_result and "attributes" in report_result["data"]:
+                positives = report_result["data"]["attributes"]["stats"]["malicious"]
+
+                if positives == 0:
+                    status = "✅ الرابط آمن تمامًا."
+                elif positives <= 3:
+                    status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+                else:
+                    status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+
+                # ✅ إرسال النتيجة مع الأزرار
+                bot.send_message(
+                    message.chat.id,
+                    f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})",
+                    parse_mode="Markdown",
+                    reply_markup=get_result_buttons()
+                )
+            else:
+                bot.send_message(
+                    message.chat.id,
+                    "❌ حدث خطأ أثناء الفحص: لم يتم العثور على بيانات التحليل.",
+                    reply_markup=get_result_buttons()
+                )
         else:
             bot.send_message(
                 message.chat.id,
