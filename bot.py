@@ -1,6 +1,6 @@
-import os
 import telebot
 import requests
+import os
 
 # ✅ طباعة جميع المتغيرات البيئية للتحقق مما يتم تحميله
 print("🔍 جميع المتغيرات البيئية:")
@@ -10,7 +10,7 @@ print(os.environ)
 print("🔍 TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
 print("🔍 VIRUSTOTAL_API_KEY:", os.getenv("VIRUSTOTAL_API_KEY"))
 
-# ✅ تحميل المتغيرات البيئية بشكل صحيح
+# ✅ تحميل المتغيرات البيئية
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 
@@ -22,6 +22,10 @@ if not VIRUSTOTAL_API_KEY:
 
 # 🔹 تهيئة البوت
 bot = telebot.TeleBot(TOKEN)
+
+# ✅ حذف الـ Webhook إذا كان مفعلًا لتجنب الخطأ 409
+bot.remove_webhook()
+
 VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
 @bot.message_handler(commands=['start'])
