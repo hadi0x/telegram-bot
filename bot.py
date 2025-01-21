@@ -35,7 +35,7 @@ def scan_url(message):
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
         response_json = response.json()  # تحويل الرد إلى JSON
 
-        # ✅ طباعة الاستجابة الكاملة لفهم الخطأ
+        # ✅ طباعة الاستجابة لفحص المشكلة
         print("🔍 استجابة API الكاملة:", response_json)
 
         if response.status_code == 200:
@@ -55,7 +55,7 @@ def scan_url(message):
 
                     bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
                 else:
-                    bot.reply_to(message, "❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.")
+                    bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.\n📌 الرد: {response_json}")
             else:
                 bot.reply_to(message, f"❌ خطأ: لم يتم العثور على 'data' في استجابة API.\n📌 الرد: {response_json}")
 
