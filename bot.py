@@ -1,10 +1,10 @@
+import os
 import requests
 import json
-import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# ✅ استدعاء المتغيرات البيئية من Railway
+# ✅ تحميل المتغيرات البيئية من `Railway`
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 
@@ -38,38 +38,42 @@ async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ الاستخدام الصحيح: `/scan <الرابط>`")
         return
 
-    # ✅ استخدام API v3 بدلاً من v2
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url}
-    response = requests.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data)
+    
+    try:
+        response = requests.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data)
 
-    if response.status_code == 200:
-        result = response.json()
-        scan_id = result["data"]["id"]
+        if response.status_code == 200:
+            result = response.json()
+            scan_id = result["data"]["id"]
 
-        # ✅ جلب النتائج التفصيلية
-        analysis_response = requests.get(f"https://www.virustotal.com/api/v3/analyses/{scan_id}", headers=headers)
-        analysis_result = analysis_response.json()
+            # ✅ جلب النتائج التفصيلية
+            analysis_response = requests.get(f"https://www.virustotal.com/api/v3/analyses/{scan_id}", headers=headers)
+            analysis_result = analysis_response.json()
 
-        positives = analysis_result["data"]["attributes"]["stats"]["malicious"]
-        total = sum(analysis_result["data"]["attributes"]["stats"].values())
+            positives = analysis_result["data"]["attributes"]["stats"]["malicious"]
+            total = sum(analysis_result["data"]["attributes"]["stats"].values())
 
-        if positives == 0:
-            status = "✅ الرابط آمن تمامًا."
-        elif positives <= 3:
-            status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+            if positives == 0:
+                status = "✅ الرابط آمن تمامًا."
+            elif positives <= 3:
+                status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+            else:
+                status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+
+            message = (
+                f"{status}\n"
+                f"🔍 عدد برامج الحماية التي اكتشفت التهديد: {positives}/{total}\n"
+                f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})"
+            )
         else:
-            status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+            message = "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك."
 
-        message = (
-            f"{status}\n"
-            f"🔍 عدد برامج الحماية التي اكتشفت التهديد: {positives}/{total}\n"
-            f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})"
-        )
-    else:
-        message = "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك."
+        await update.message.reply_text(message)
 
-    await update.message.reply_text(message)
+    except Exception as e:
+        await update.message.reply_text(f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
 
 # ✅ إنشاء التطبيق
 app = ApplicationBuilder().token(BOT_TOKEN).build()
