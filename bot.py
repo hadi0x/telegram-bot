@@ -79,8 +79,8 @@ def scan_url(message, direct=False):
             result = response.json()
             scan_id = result["data"]["id"]
 
-            # انتظار 10 ثواني قبل جلب النتيجة
-            time.sleep(10)
+            # انتظار 15 ثانية قبل جلب النتيجة النهائية
+            time.sleep(15)
 
             # جلب النتيجة النهائية
             result_response = requests.get(f"https://www.virustotal.com/api/v3/analyses/{scan_id}", headers=headers)
