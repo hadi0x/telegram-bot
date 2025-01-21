@@ -35,25 +35,32 @@ def scan_url(message):
         response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
         response_json = response.json()  # تحويل الرد إلى JSON
 
-        print("🔍 استجابة API الكاملة:", response_json)  # ✅ طباعة الاستجابة لرؤية المشكلة
+        # ✅ طباعة الاستجابة الكاملة لفهم الخطأ
+        print("🔍 استجابة API الكاملة:", response_json)
 
-        if response.status_code == 200 and "data" in response_json:
-            scan_id = response_json["data"]["id"]
-            if "attributes" in response_json["data"]:
-                positives = response_json["data"]["attributes"]["last_analysis_stats"]["malicious"]
+        if response.status_code == 200:
+            if "data" in response_json:
+                scan_id = response_json["data"]["id"]
 
-                if positives == 0:
-                    status = "✅ الرابط آمن تمامًا."
-                elif positives <= 3:
-                    status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+                # ✅ التأكد مما إذا كان `attributes` موجودًا
+                if "attributes" in response_json["data"]:
+                    positives = response_json["data"]["attributes"]["last_analysis_stats"]["malicious"]
+
+                    if positives == 0:
+                        status = "✅ الرابط آمن تمامًا."
+                    elif positives <= 3:
+                        status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+                    else:
+                        status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+
+                    bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
                 else:
-                    status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
-
-                bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
+                    bot.reply_to(message, "❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.")
             else:
-                bot.reply_to(message, "❌ حدث خطأ أثناء الفحص: الاستجابة لا تحتوي على 'attributes'.")
+                bot.reply_to(message, f"❌ خطأ: لم يتم العثور على 'data' في استجابة API.\n📌 الرد: {response_json}")
+
         else:
-            bot.reply_to(message, f"❌ خطأ في الاستجابة من API: {response_json.get('error', 'مشكلة غير معروفة')}")
+            bot.reply_to(message, f"❌ خطأ في الاتصال بـ VirusTotal API: {response.status_code}\n📌 الرد: {response_json}")
 
     except Exception as e:
         bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
