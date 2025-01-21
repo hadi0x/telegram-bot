@@ -33,8 +33,8 @@ def get_welcome_message():
         "🤲 *لا تنسوني من دعائكم!*"
     )
 
-# ✅ إنشاء لوحة الأزرار
-def get_main_buttons():
+# ✅ إنشاء لوحة الأزرار عند النتيجة فقط
+def get_result_buttons():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("🔄 فحص رابط آخر", callback_data="rescan"))
     markup.add(InlineKeyboardButton("👤 من أنا؟", callback_data="about"))
@@ -46,8 +46,7 @@ def start(message):
     bot.send_message(
         message.chat.id,
         get_welcome_message(),
-        parse_mode="Markdown",
-        reply_markup=get_main_buttons()
+        parse_mode="Markdown"
     )
 
 @bot.message_handler(commands=['scan'])
@@ -65,31 +64,35 @@ def scan_url(message):
             scan_id = result["data"]["id"]
             bot.send_message(
                 message.chat.id,
-                f"🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍\n\n"
+                f"🔄 يتم الآن فحص الرابط... يرجى الانتظار 🔍",
+            )
+
+            # إرسال النتيجة مع الأزرار
+            bot.send_message(
+                message.chat.id,
                 f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})",
                 parse_mode="Markdown",
-                reply_markup=get_main_buttons()
+                reply_markup=get_result_buttons()
             )
         else:
             bot.send_message(
                 message.chat.id,
                 "❌ حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.",
-                reply_markup=get_main_buttons()
+                reply_markup=get_result_buttons()
             )
 
     except Exception as e:
         bot.send_message(
             message.chat.id,
             f"❌ حدث خطأ أثناء الفحص:\n{str(e)}",
-            reply_markup=get_main_buttons()
+            reply_markup=get_result_buttons()
         )
 
 @bot.callback_query_handler(func=lambda call: call.data == "rescan")
 def rescan(call):
     bot.send_message(
         call.message.chat.id,
-        "📌 أرسل الرابط الذي تريد فحصه مجددًا:",
-        reply_markup=get_main_buttons()
+        "📌 أرسل الرابط الذي تريد فحصه مجددًا:"
     )
 
 @bot.callback_query_handler(func=lambda call: call.data == "about")
