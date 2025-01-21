@@ -1,59 +1,83 @@
-import telebot
 import requests
+import json
 import os
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# ✅ طباعة المتغيرات البيئية في الـ Logs لمعرفة ما إذا كانت تُقرأ بشكل صحيح
-print("🔍 TELEGRAM_BOT_TOKEN (Direct):", os.environ.get("TELEGRAM_BOT_TOKEN"))
-print("🔍 VIRUSTOTAL_API_KEY (Direct):", os.environ.get("VIRUSTOTAL_API_KEY"))
-
-print("🔍 TELEGRAM_BOT_TOKEN (getenv):", os.getenv("TELEGRAM_BOT_TOKEN"))
-print("🔍 VIRUSTOTAL_API_KEY (getenv):", os.getenv("VIRUSTOTAL_API_KEY"))
-
-# ✅ تحميل المتغيرات البيئية بشكل صحيح
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# ✅ استدعاء المتغيرات البيئية من Railway
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 
 # ✅ التأكد من أن التوكنات محملة بشكل صحيح
-if not TOKEN:
+if not BOT_TOKEN:
     raise ValueError("❌ خطأ: لم يتم العثور على `TELEGRAM_BOT_TOKEN` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
 if not VIRUSTOTAL_API_KEY:
     raise ValueError("❌ خطأ: لم يتم العثور على `VIRUSTOTAL_API_KEY` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
 
-# 🔹 تهيئة البوت
-bot = telebot.TeleBot(TOKEN)
-VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رد ترحيبي عند تشغيل البوت."""
+    await update.message.reply_text(
+        "✅ مرحبًا بك في بوت فحص الروابط عبر VirusTotal!\n"
+        "📌 استخدم `/scan <الرابط>` لفحص الرابط."
+    )
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "✅ مرحبًا بك! أرسل لي رابطًا وسأقوم بفحصه عبر VirusTotal 🔍")
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إرسال قائمة بالأوامر المتاحة."""
+    await update.message.reply_text(
+        "📌 الأوامر المتاحة:\n"
+        "✅ /start - بدء المحادثة مع البوت\n"
+        "✅ /help - عرض قائمة الأوامر\n"
+        "✅ /scan <الرابط> - فحص الرابط باستخدام VirusTotal"
+    )
 
-@bot.message_handler(func=lambda message: message.text.startswith("http"))
-def scan_url(message):
-    url_to_scan = message.text
-    headers = {"x-apikey": VIRUSTOTAL_API_KEY}
-    data = {"url": url_to_scan}
-
+async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فحص الروابط باستخدام VirusTotal API."""
     try:
-        response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
-        
-        if response.status_code == 200:
-            result = response.json()
-            scan_id = result["data"]["id"]
-            positives = result["data"]["attributes"]["last_analysis_stats"]["malicious"]
-            
-            if positives == 0:
-                status = "✅ الرابط آمن تمامًا."
-            elif positives <= 3:
-                status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
-            else:
-                status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+        url = context.args[0]
+    except IndexError:
+        await update.message.reply_text("❌ الاستخدام الصحيح: `/scan <الرابط>`")
+        return
 
-            bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
+    # ✅ استخدام API v3 بدلاً من v2
+    headers = {"x-apikey": VIRUSTOTAL_API_KEY}
+    data = {"url": url}
+    response = requests.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        scan_id = result["data"]["id"]
+
+        # ✅ جلب النتائج التفصيلية
+        analysis_response = requests.get(f"https://www.virustotal.com/api/v3/analyses/{scan_id}", headers=headers)
+        analysis_result = analysis_response.json()
+
+        positives = analysis_result["data"]["attributes"]["stats"]["malicious"]
+        total = sum(analysis_result["data"]["attributes"]["stats"].values())
+
+        if positives == 0:
+            status = "✅ الرابط آمن تمامًا."
+        elif positives <= 3:
+            status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
         else:
-            bot.reply_to(message, "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.")
+            status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
 
-    except Exception as e:
-        bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
+        message = (
+            f"{status}\n"
+            f"🔍 عدد برامج الحماية التي اكتشفت التهديد: {positives}/{total}\n"
+            f"🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})"
+        )
+    else:
+        message = "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك."
 
-# 🔹 تشغيل البوت
-bot.polling()
+    await update.message.reply_text(message)
+
+# ✅ إنشاء التطبيق
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+# ✅ إضافة الأوامر إلى البوت
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("help", help_command))
+app.add_handler(CommandHandler("scan", scan))
+
+# ✅ تشغيل البوت
+app.run_polling()
