@@ -4,7 +4,11 @@ import json
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# ✅ تحميل المتغيرات البيئية من `Railway`
+# ✅ طباعة التوكنات في `Logs` للتحقق من تحميلها من `Railway`
+print("🔍 TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
+print("🔍 VIRUSTOTAL_API_KEY:", os.getenv("VIRUSTOTAL_API_KEY"))
+
+# ✅ تحميل التوكنات من `Railway`
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 
