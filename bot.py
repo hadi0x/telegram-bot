@@ -2,10 +2,15 @@ import telebot
 import requests
 import os
 
-# ✅ التأكد من تحميل المتغيرات البيئية بشكل صحيح
-TOKEN = os.getenv("7859572276:AAG36DlsII_cvHJauTAVshNreoMSYa1Qf7k")
-VIRUSTOTAL_API_KEY = os.getenv("7a9df9d88643a593720947c3d81bd56e71dc978cb2204618b89a3d32d3211174")
+# ✅ التحقق من تحميل المتغيرات البيئية وعرضها في الـ Logs
+print("🔍 TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
+print("🔍 VIRUSTOTAL_API_KEY:", os.getenv("VIRUSTOTAL_API_KEY"))
 
+# ✅ تحميل المتغيرات البيئية بشكل صحيح
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+
+# ✅ التأكد من أن التوكنات محملة بشكل صحيح
 if not TOKEN:
     raise ValueError("❌ خطأ: لم يتم العثور على `TELEGRAM_BOT_TOKEN` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
 if not VIRUSTOTAL_API_KEY:
