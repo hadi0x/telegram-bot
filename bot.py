@@ -2,9 +2,12 @@ import telebot
 import requests
 import os
 
-# ✅ التحقق من تحميل المتغيرات البيئية وعرضها في الـ Logs
-print("🔍 TELEGRAM_BOT_TOKEN:", os.getenv("TELEGRAM_BOT_TOKEN"))
-print("🔍 VIRUSTOTAL_API_KEY:", os.getenv("VIRUSTOTAL_API_KEY"))
+# ✅ طباعة المتغيرات البيئية في الـ Logs لمعرفة ما إذا كانت تُقرأ بشكل صحيح
+print("🔍 TELEGRAM_BOT_TOKEN (Direct):", os.environ.get("TELEGRAM_BOT_TOKEN"))
+print("🔍 VIRUSTOTAL_API_KEY (Direct):", os.environ.get("VIRUSTOTAL_API_KEY"))
+
+print("🔍 TELEGRAM_BOT_TOKEN (getenv):", os.getenv("TELEGRAM_BOT_TOKEN"))
+print("🔍 VIRUSTOTAL_API_KEY (getenv):", os.getenv("VIRUSTOTAL_API_KEY"))
 
 # ✅ تحميل المتغيرات البيئية بشكل صحيح
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
