@@ -2,11 +2,18 @@ import telebot
 import requests
 import os
 
-TOKEN = os.getenv("7899572276:AAG36D1sII_cvHJauTAVshNreoMSYa1QF7k")
+# ✅ التأكد من تحميل المتغيرات البيئية بشكل صحيح
+TOKEN = os.getenv("7859572276:AAG36DlsII_cvHJauTAVshNreoMSYa1Qf7k")
 VIRUSTOTAL_API_KEY = os.getenv("7a9df9d88643a593720947c3d81bd56e71dc978cb2204618b89a3d32d3211174")
-VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
+if not TOKEN:
+    raise ValueError("❌ خطأ: لم يتم العثور على `TELEGRAM_BOT_TOKEN` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
+if not VIRUSTOTAL_API_KEY:
+    raise ValueError("❌ خطأ: لم يتم العثور على `VIRUSTOTAL_API_KEY` في المتغيرات البيئية! تأكد من إضافته في `Railway`.")
+
+# 🔹 تهيئة البوت
 bot = telebot.TeleBot(TOKEN)
+VIRUSTOTAL_URL = "https://www.virustotal.com/api/v3/urls"
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -18,22 +25,27 @@ def scan_url(message):
     headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     data = {"url": url_to_scan}
 
-    response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
-
-    if response.status_code == 200:
-        result = response.json()
-        scan_id = result["data"]["id"]
-        positives = result["data"]["attributes"]["last_analysis_stats"]["malicious"]
+    try:
+        response = requests.post(VIRUSTOTAL_URL, headers=headers, data=data)
         
-        if positives == 0:
-            status = "✅ الرابط آمن تمامًا."
-        elif positives <= 3:
-            status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+        if response.status_code == 200:
+            result = response.json()
+            scan_id = result["data"]["id"]
+            positives = result["data"]["attributes"]["last_analysis_stats"]["malicious"]
+            
+            if positives == 0:
+                status = "✅ الرابط آمن تمامًا."
+            elif positives <= 3:
+                status = "⚠️ الرابط مشبوه، يرجى توخي الحذر."
+            else:
+                status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+
+            bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
         else:
-            status = "❌ الرابط احتيالي أو ضار، لا تقم بفتحه!"
+            bot.reply_to(message, "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.")
 
-        bot.reply_to(message, f"{status}\n🔗 [رابط التحليل](https://www.virustotal.com/gui/url/{scan_id})")
-    else:
-        bot.reply_to(message, "❌ حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.")
+    except Exception as e:
+        bot.reply_to(message, f"❌ حدث خطأ أثناء الفحص:\n{str(e)}")
 
+# 🔹 تشغيل البوت
 bot.polling()
