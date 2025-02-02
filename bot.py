@@ -44,7 +44,11 @@ def greet_user(message):
 2️⃣ **انتظر قليلاً وسأخبرك بالنتيجة. 😳**  
 
 ⚠️ لا تنسوني من دعائكم! 🙌"""
-    bot.reply_to(message, welcome_text, parse_mode="Markdown")
+
+    try:
+        bot.reply_to(message, welcome_text, parse_mode="Markdown")
+    except:
+        bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
 
 # 🔹 فحص الروابط عند إرسالها مباشرةً بدون الحاجة إلى `/scan`
 @bot.message_handler(func=lambda message: is_url(message.text))
@@ -81,7 +85,7 @@ def scan_url(message, direct=False):
 
             # انتظار 10 ثوانٍ ثم تحديث المستخدم
             time.sleep(10)
-            bot.reply_to(message, "⌛ **ما زال الفحص جاريًا... تبقى 10 ثوانٍ.**")
+            bot.send_message(message.chat.id, "⌛ **ما زال الفحص جاريًا... تبقى 10 ثوانٍ.**")
 
             # انتظار 10 ثوانٍ إضافية ليصبح المجموع 20 ثانية
             time.sleep(10)
@@ -108,14 +112,14 @@ def scan_url(message, direct=False):
                     InlineKeyboardButton("👤 من أنا؟", callback_data="who_am_i")
                 )
 
-                bot.reply_to(message, status, reply_markup=keyboard, parse_mode="Markdown")
+                bot.send_message(message.chat.id, status, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                bot.reply_to(message, "❌ **حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.**")
+                bot.send_message(message.chat.id, "❌ **حدث خطأ أثناء الفحص: لم يتم العثور على 'attributes' في استجابة API.**")
         else:
-            bot.reply_to(message, "❌ **حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.**")
+            bot.send_message(message.chat.id, "❌ **حدث خطأ أثناء الفحص، تأكد من مفتاح API الخاص بك.**")
 
     except Exception as e:
-        bot.reply_to(message, f"❌ **حدث خطأ أثناء الفحص:**\n`{str(e)}`", parse_mode="Markdown")
+        bot.send_message(message.chat.id, f"❌ **حدث خطأ أثناء الفحص:**\n`{str(e)}`", parse_mode="Markdown")
 
 # 🔹 التعامل مع الأزرار
 @bot.callback_query_handler(func=lambda call: True)
